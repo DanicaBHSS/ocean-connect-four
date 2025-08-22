@@ -1,1 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Under the Sea Connect 4</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+            background: linear-gradient(to bottom, #4ca1af, #2c3e50);
+            overflow: hidden;
+            cursor: none;
+        }
+        #fish-cursor {
+            position: fixed;
+            font-size: 2rem;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s ease-out;
+        }
+        .font-fredoka {
+            font-family: 'Fredoka One', cursive;
+        }
+        #underwater-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+        .bubble {
+            position: absolute;
+            bottom: -50px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            animation: floatUp 15s linear infinite;
+        }
+        @keyframes floatUp {
+            to {
+                transform: translateY(-110vh);
+                opacity: 0;
+            }
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            background-color: rgba(23, 107, 135, 0.7);
+            backdrop-filter: blur(4px);
+            padding: 8px;
+            border-radius: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            aspect-ratio: 7 / 6;
+            width: 100%;
+            max-width: 560px;
+            position: relative;
+        }
+        .column {
+            display: grid;
+            grid-template-rows: repeat(6, 1fr);
+            gap: 8px;
+            cursor: none;
+            position: relative; 
+        }
+        .column:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .cell {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            aspect-ratio: 1 / 1;
+            z-index: 1;
+        }
+        .piece {
+            width: 100%;
+            height: calc((100% - 40px) / 6);
+            border-radius: 50%;
+            position: absolute;
+            left: 0;
+            top: -100px; 
+            transition: top 0.5s cubic-bezier(0.5, -0.55, 0.27, 1.55);
+            z-index: 2;
+            background-image: radial-gradient(circle at 25% 25%, rgba(255,255,255,0.9), rgba(255,255,255,0.2) 70%);
+            box-shadow: inset 0 0 8px rgba(255,255,255,0.5), 0 0 10px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .player1-bubble, .player1 {
+            background-color: rgba(239, 68, 68, 0.8); /* red-500 */
+        }
+        .player2-bubble, .player2 {
+            background-color: rgba(245, 158, 11, 0.8); /* amber-500 */
+        }
+        .winning-piece {
+            animation: win-shimmer 1.5s infinite;
+        }
+        @keyframes win-shimmer {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 15px #fff, 0 0 25px #fff; }
+            50% { transform: scale(1.1); box-shadow: 0 0 25px #fff, 0 0 40px #fff; }
+        }
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2393c5fd' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+        button, select {
+            cursor: none;
+        }
+        .menu-bubble {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 auto 0.5rem;
+            background-image: radial-gradient(circle at 25% 25%, rgba(255,255,255,0.9), rgba(255,255,255,0.2) 70%);
+            box-shadow: inset 0 0 5px rgba(255,255,255,0.5), 0 2px 5px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        #word-display-container {
+            transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
+        }
+        .player1-active {
+            box-shadow: 0 0 20px #fca5a5, 0 0 30px #fca5a5;
+            border-color: #fca5a5 !important;
+        }
+        .player2-active {
+            box-shadow: 0 0 20px #fcd34d, 0 0 30px #fcd34d;
+            border-color: #fcd34d !important;
+        }
+        #rotate-device-message {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0c0a1a;
+            color: white;
+            z-index: 10000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        @media (max-width: 767px) and (orientation: portrait) {
+            #rotate-device-message {
+                display: flex;
+            }
+            #main-menu, #game-screen {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+    <div id="underwater-bg"></div>
+    <div id="fish-cursor">🐠</div>
 
+    <div id="rotate-device-message">
+        <div class="text-5xl mb-4">🔄</div>
+        <h2 class="font-fredoka text-3xl">Please rotate your device to landscape mode to play!</h2>
+    </div>
+
+    <!-- Main Menu Screen -->
+    <div id="main-menu" class="w-full max-w-2xl text-center bg-white/20 backdrop-blur-sm p-8 rounded-2xl shadow-lg border border-white/30">
+        <h1 class="font-fredoka text-5xl text-white mb-6" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.4);">Under the Sea Connect 4</h1>
+        
+        <div class="flex flex-col md:flex-row gap-8">
+            <!-- Player 1 Settings -->
+            <div class="flex-1 border-2 border-red-300/50 p-4 rounded-lg bg-black/10">
+                <div class="menu-bubble player1-bubble"></div>
+                <div class="mb-4">
+                    <label for="p1-sound-select" class="block text-lg font-semibold text-gray-100 mb-2">Sound:</label>
+                    <select id="p1-sound-select" data-player="1" class="player-sound-select w-full p-3 bg-gray-700/50 border border-red-300/50 rounded-lg text-lg text-white focus:ring-2 focus:ring-red-300">
+                        <option value="none">Just for Fun</option>
+                        <option value="k">/k/</option> <option value="g">/g/</option> <option value="f">/f/</option>
+                        <option value="s">/s/</option> <option value="l">/l/</option> <option value="r">/r/</option>
+                        <option value="sh">/sh/</option> <option value="ch">/ch/</option> <option value="th">/th/</option>
+                    </select>
+                </div>
+                <div id="p1-position-container" class="player-options-container mb-4 hidden">
+                    <label for="p1-position-select" class="block text-lg font-semibold text-gray-100 mb-2">Position:</label>
+                    <select id="p1-position-select" class="w-full p-3 bg-gray-700/50 border border-red-300/50 rounded-lg text-lg text-white focus:ring-2 focus:ring-red-300">
+                        <option value="mixed">Mixed</option> <option value="initial">Initial</option>
+                        <option value="medial">Medial</option> <option value="final">Final</option>
+                    </select>
+                </div>
+                 <div id="p1-level-container" class="player-options-container mb-6 hidden">
+                    <label for="p1-level-select" class="block text-lg font-semibold text-gray-100 mb-2">Level:</label>
+                    <select id="p1-level-select" class="w-full p-3 bg-gray-700/50 border border-red-300/50 rounded-lg text-lg text-white focus:ring-2 focus:ring-red-300">
+                        <option value="word">Word</option> <option value="phrase">Phrase</option>
+                        <option value="sentence">Sentence</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Player 2 Settings -->
+            <div class="flex-1 border-2 border-amber-300/50 p-4 rounded-lg bg-black/10">
+                <div class="menu-bubble player2-bubble"></div>
+                <div class="mb-4">
+                    <label for="p2-sound-select" class="block text-lg font-semibold text-gray-100 mb-2">Sound:</label>
+                    <select id="p2-sound-select" data-player="2" class="player-sound-select w-full p-3 bg-gray-700/50 border border-amber-300/50 rounded-lg text-lg text-white focus:ring-2 focus:ring-amber-300">
+                        <option value="none">Just for Fun</option>
+                        <option value="k">/k/</option> <option value="g">/g/</option> <option value="f">/f/</option>
+                        <option value="s">/s/</option> <option value="l">/l/</option> <option value="r">/r/</option>
+                        <option value="sh">/sh/</option> <option value="ch">/ch/</option> <option value="th">/th/</option>
+                    </select>
+                </div>
+                <div id="p2-position-container" class="player-options-container mb-4 hidden">
+                    <label for="p2-position-select" class="block text-lg font-semibold text-gray-100 mb-2">Position:</label>
+                    <select id="p2-position-select" class="w-full p-3 bg-gray-700/50 border border-amber-300/50 rounded-lg text-lg text-white focus:ring-2 focus:ring-amber-300">
+                        <option value="mixed">Mixed</option> <option value="initial">Initial</option>
+                        <option value="medial">Medial</option> <option value="final">Final</option>
+                    </select>
+                </div>
+                <div id="p2-level-container" class="player-options-container mb-6 hidden">
+                    <label for="p2-level-select" class="block text-lg font-semibold text-gray-100 mb-2">Level:</label>
+                    <select id="p2-level-select" class="w-full p-3 bg-gray-700/50 border border-amber-300/50 rounded-lg text-lg text-white focus:ring-2 focus:ring-amber-300">
+                        <option value="word">Word</option> <option value="phrase">Phrase</option>
+                        <option value="sentence">Sentence</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <button id="start-game-btn" class="w-full mt-6 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg text-2xl font-fredoka transition-transform transform hover:scale-105 shadow-lg">
+            Start Game
+        </button>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="hidden w-full max-w-5xl">
+        <div class="flex flex-col md:flex-row items-center justify-center gap-8">
+            <div class="flex-grow flex flex-col items-center">
+                <div id="status-message" class="h-12 text-center text-3xl font-bold mb-4 font-fredoka text-white" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.4);"></div>
+                <div id="game-board" class="board"></div>
+                <div class="flex items-center gap-4 mt-6">
+                    <button id="restart-game-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg text-xl font-fredoka transition-transform transform hover:scale-105 shadow-lg">Play Again</button>
+                    <button id="back-to-menu-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg text-xl font-fredoka transition-transform transform hover:scale-105 shadow-lg">Menu</button>
+                </div>
+            </div>
+            <div id="word-display-container" class="w-full md:w-80 bg-white/20 backdrop-blur-sm p-6 rounded-2xl shadow-lg text-center flex-shrink-0 border-2 border-white/30">
+                <div id="word-emoji" class="text-6xl mb-4">🎯</div>
+                <p id="word-text" class="text-3xl font-bold text-gray-100 leading-tight">Word</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const mainMenu = document.getElementById('main-menu');
+        const gameScreen = document.getElementById('game-screen');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const restartGameBtn = document.getElementById('restart-game-btn');
+        const backToMenuBtn = document.getElementById('back-to-menu-btn');
+        const gameBoard = document.getElementById('game-board');
+        const statusMessage = document.getElementById('status-message');
+        const wordDisplayContainer = document.getElementById('word-display-container');
+        const wordEmoji = document.getElementById('word-emoji');
+        const wordText = document.getElementById('word-text');
+        const underwaterBg = document.getElementById('underwater-bg');
+        const fishCursor = document.getElementById('fish-cursor');
+        const p1 = {
+            sound: document.getElementById('p1-sound-select'),
+            position: document.getElementById('p1-position-select'),
+            level: document.getElementById('p1-level-select')
+        };
+        const p2 = {
+            sound: document.getElementById('p2-sound-select'),
+            position: document.getElementById('p2-position-select'),
+            level: document.getElementById('p2-level-select')
+        };
+
+        // --- Game State ---
+        let board = [], currentPlayer = 1, gameOver = false;
+        let p1Settings = {}, p2Settings = {};
+        let p1GameList = [], p2GameList = [];
+        let sounds = {};
+
+        // --- Carrier Phrases and Sentences ---
+        const carrierData = {
+            k: { phrase: "A quick ___.", sentence: "The cool king kicked the ___." },
+            g: { phrase: "Go get the ___.", sentence: "The good goat ate a green ___." },
+            f: { phrase: "A fun ___.", sentence: "Five friends found a ___." },
+            s: { phrase: "A silly ___.", sentence: "I saw a silly ___." },
+            l: { phrase: "A long, lazy ___.", sentence: "Look at the little ___." },
+            r: { phrase: "A red ___.", sentence: "The rabbit ran around the ___." },
+            sh: { phrase: "She has a ___.", sentence: "She should wash the ___." },
+            ch: { phrase: "Choose a ___.", sentence: "The teacher chose the ___." },
+            th: { phrase: "I think it's a ___.", sentence: "They have the ___." }
+        };
+
+        // --- Word Data ---
+        const soundData = {
+            k: {
+                initial: [{word:"Key", emoji:"🔑"}, {word:"Cat", emoji:"🐈"}, {word:"Cake", emoji:"🍰"}, {word:"Cow", emoji:"🐄"}, {word:"King", emoji:"👑"}, {word:"Coat", emoji:"🧥"}, {word:"Cup", emoji:"🥤"}, {word:"Carrot", emoji:"🥕"}, {word:"Kite", emoji:"🪁"}, {word:"Castle", emoji:"🏰"}],
+                medial: [{word:"Baking", emoji:"🧑‍🍳"}, {word:"Soccer", emoji:"⚽"}, {word:"Jacket", emoji:"🧥"}, {word:"Monkey", emoji:"🐒"}, {word:"Taco", emoji:"🌮"}, {word:"Rocket", emoji:"🚀"}, {word:"Chicken", emoji:"🐔"}, {word:"Pumpkin", emoji:"🎃"}, {word:"Doctor", emoji:"👨‍⚕️"}, {word:"Vacuum", emoji:"🧹"}],
+                final: [{word:"Book", emoji:"📖"}, {word:"Bike", emoji:"🚲"}, {word:"Milk", emoji:"🥛"}, {word:"Sock", emoji:"🧦"}, {word:"Clock", emoji:"⏰"}, {word:"Snake", emoji:"🐍"}, {word:"Park", emoji:"🏞️"}, {word:"Fork", emoji:"🍴"}]
+            },
+            g: {
+                initial: [{word:"Goat", emoji:"🐐"}, {word:"Gate", emoji:"🚪"}, {word:"Green", emoji:"🟢"}, {word:"Glue", emoji:"🧴"}, {word:"Gold", emoji:"🥇"}, {word:"Gift", emoji:"🎁"}, {word:"Game", emoji:"🎮"}, {word:"Goose", emoji:"🦢"}, {word:"Guitar", emoji:"🎸"}, {word:"Gum", emoji:"🍬"}],
+                medial: [{word:"Tiger", emoji:"🐅"}, {word:"Wagon", emoji:"🛒"}, {word:"Dragon", emoji:"🐉"}, {word:"Sugar", emoji:"🍬"}, {word:"Eagle", emoji:"🦅"}, {word:"Magic", emoji:"🪄"}, {word:"Yogurt", emoji:"🍦"}, {word:"Magnet", emoji:"🧲"}, {word:"Digger", emoji:"⛏️"}, {word:"Juggling", emoji:"🤹"}],
+                final: [{word:"Pig", emoji:"🐖"}, {word:"Dog", emoji:"🐕"}, {word:"Egg", emoji:"🥚"}, {word:"Frog", emoji:"🐸"}, {word:"Bug", emoji:"🐞"}, {word:"Flag", emoji:"🚩"}, {word:"Leg", emoji:"🦵"}, {word:"Dig", emoji:"⛏️"}, {word:"Big", emoji:"👍"}, {word:"Mug", emoji:"☕"}]
+            },
+            f: {
+                initial: [{word:"Fish", emoji:"🐟"}, {word:"Fan", emoji:"🌬️"}, {word:"Four", emoji:"4️⃣"}, {word:"Fire", emoji:"🔥"}, {word:"Face", emoji:"😀"}, {word:"Foot", emoji:"🦶"}, {word:"Farm", emoji:"🚜"}, {word:"Fall", emoji:"🍂"}, {word:"Family", emoji:"👨‍👩‍👧‍👦"}, {word:"Fork", emoji:"🍴"}],
+                medial: [{word:"Coffee", emoji:"☕"}, {word:"Muffin", emoji:"🧁"}, {word:"Dolphin", emoji:"🐬"}, {word:"Elephant", emoji:"🐘"}, {word:"Waffle", emoji:"🧇"}, {word:"Office", emoji:"🏢"}, {word:"Perfume", emoji:"🧴"}, {word:"Telephone", emoji:"☎️"}, {word:"Sofa", emoji:"🛋️"}, {word:"Gopher", emoji:"🐿️"}],
+                final: [{word:"Leaf", emoji:"🍁"}, {word:"Hoof", emoji:"🐴"}, {word:"Giraffe", emoji:"🦒"}, {word:"Roof", emoji:"🏠"}, {word:"Chef", emoji:"👨‍🍳"}, {word:"Scarf", emoji:"🧣"}, {word:"Wolf", emoji:"🐺"}, {word:"Beef", emoji:"🥩"}, {word:"Wife", emoji:"👩"}, {word:"Cough", emoji:"🤧"}]
+            },
+            s: {
+                initial: [{word:"Sun", emoji:"☀️"}, {word:"Soap", emoji:"🧼"}, {word:"Seal", emoji:"🦭"}, {word:"Socks", emoji:"🧦"}, {word:"Sad", emoji:"😔"}, {word:"Sing", emoji:"🎤"}, {word:"Seven", emoji:"7️⃣"}, {word:"Soup", emoji:"🥣"}, {word:"Salad", emoji:"🥗"}, {word:"City", emoji:"🏙️"}],
+                medial: [{word:"Pencil", emoji:"✏️"}, {word:"Bicycle", emoji:"🚲"}, {word:"Castle", emoji:"🏰"}, {word:"Fossil", emoji:"🦴"}, {word:"Vase", emoji:"🏺"}, {word:"Muscles", emoji:"💪"}, {word:"Eraser", emoji:"🧼"}, {word:"Police", emoji:"👮"}, {word:"Dinosaur", emoji:"🦕"}, {word:"Scissors", emoji:"✂️"}],
+                final: [{word:"Bus", emoji:"🚌"}, {word:"House", emoji:"🏠"}, {word:"Mouse", emoji:"🐁"}, {word:"Juice", emoji:"🧃"}, {word:"Yes", emoji:"👍"}, {word:"Ice", emoji:"🧊"}, {word:"Cactus", emoji:"🌵"}, {word:"Horse", emoji:"🐎"}, {word:"Cheese", emoji:"🧀"}, {word:"Peace", emoji:"✌️"}]
+            },
+            l: {
+                initial: [{word:"Lion", emoji:"🦁"}, {word:"Leaf", emoji:"🍃"}, {word:"Lamp", emoji:"💡"}, {word:"Lemon", emoji:"🍋"}, {word:"Leg", emoji:"🦵"}, {word:"Light", emoji:"🔦"}, {word:"Ladybug", emoji:"🐞"}, {word:"Lizard", emoji:"🦎"}, {word:"Love", emoji:"❤️"}, {word:"Laugh", emoji:"😂"}],
+                medial: [{word:"Salad", emoji:"🥗"}, {word:"Jelly", emoji:"🍓"}, {word:"Balloon", emoji:"🎈"}, {word:"Elephant", emoji:"🐘"}, {word:"Police", emoji:"👮"}, {word:"Dollar", emoji:"💵"}, {word:"Volcano", emoji:"🌋"}, {word:"Helicopter", emoji:"🚁"}, {word:"Alligator", emoji:"🐊"}, {word:"Calendar", emoji:"📅"}],
+                final: [{word:"Ball", emoji:"⚽"}, {word:"Apple", emoji:"🍎"}, {word:"Bell", emoji:"🔔"}, {word:"Whale", emoji:"🐋"}, {word:"School", emoji:"🏫"}, {word:"Pool", emoji:"🏊"}, {word:"Nail", emoji:"💅"}, {word:"Mail", emoji:"✉️"}, {word:"Seal", emoji:"🦭"}, {word:"Smile", emoji:"😊"}]
+            },
+            r: {
+                initial: [{word:"Rabbit", emoji:"🐇"}, {word:"Rain", emoji:"🌧️"}, {word:"Ring", emoji:"💍"}, {word:"Red", emoji:"🔴"}, {word:"Robot", emoji:"🤖"}, {word:"Rice", emoji:"🍚"}, {word:"Read", emoji:"📚"}, {word:"Rainbow", emoji:"🌈"}, {word:"Run", emoji:"🏃"}, {word:"Rock", emoji:"🪨"}],
+                medial: [{word:"Carrot", emoji:"🥕"}, {word:"Orange", emoji:"🍊"}, {word:"Crayon", emoji:"🖍️"}, {word:"Gorilla", emoji:"🦍"}, {word:"Zero", emoji:"0️⃣"}, {word:"Giraffe", emoji:"🦒"}, {word:"Parrot", emoji:"🦜"}, {word:"Cherry", emoji:"🍒"}, {word:"Arrow", emoji:"➡️"}, {word:"Camera", emoji:"📷"}],
+                final: [{word:"Car", emoji:"🚗"}, {word:"Star", emoji:"⭐"}, {word:"Bear", emoji:"🐻"}, {word:"Door", emoji:"🚪"}, {word:"Four", emoji:"4️⃣"}, {word:"Chair", emoji:"🪑"}, {word:"Fire", emoji:"🔥"}, {word:"Pear", emoji:"🍐"}, {word:"Spider", emoji:"🕷️"}, {word:"Tiger", emoji:"🐅"}]
+            },
+            sh: {
+                initial: [{word:"Sheep", emoji:"🐑"}, {word:"Shoe", emoji:"👟"}, {word:"Ship", emoji:"🚢"}, {word:"Shell", emoji:"🐚"}, {word:"Shark", emoji:"🦈"}, {word:"Shirt", emoji:"👕"}, {word:"Shovel", emoji:"⛏️"}, {word:"Shadow", emoji:"👤"}, {word:"Shake", emoji:"🥤"}, {word:"Shower", emoji:"🚿"}],
+                medial: [{word:"Mushroom", emoji:"🍄"}, {word:"Ocean", emoji:"🌊"}, {word:"Tissue", emoji:"🤧"}, {word:"Washing", emoji:"🧼"}, {word:"Dishes", emoji:"🍽️"}, {word:"Sunshine", emoji:"☀️"}, {word:"Pushing", emoji:"👉"}, {word:"Fishing", emoji:"🎣"}, {word:"Flashlight", emoji:"🔦"}, {word:"Nation", emoji:"🇺🇳"}],
+                final: [{word:"Fish", emoji:"🐠"}, {word:"Brush", emoji:"🖌️"}, {word:"Trash", emoji:"🗑️"}, {word:"Bush", emoji:"🌳"}, {word:"Cash", emoji:"💵"}, {word:"Eyelash", emoji:"👀"}, {word:"Wash", emoji:"🧼"}, {word:"Push", emoji:"👉"}, {word:"Radish", emoji:"🥕"}, {word:"Wish", emoji:"✨"}]
+            },
+            ch: {
+                initial: [{word:"Chair", emoji:"🪑"}, {word:"Cheese", emoji:"🧀"}, {word:"Chick", emoji:"🐥"}, {word:"Chin", emoji:"😀"}, {word:"Chew", emoji:"😋"}, {word:"Cherry", emoji:"🍒"}, {word:"Chips", emoji:"🍟"}, {word:"Chalk", emoji:"✍️"}, {word:"Chain", emoji:"⛓️"}, {word:"Chase", emoji:"🏃"}],
+                medial: [{word:"Teacher", emoji:"🧑‍🏫"}, {word:"Ketchup", emoji:"🍅"}, {word:"Kitchen", emoji:"🍳"}, {word:"Nature", emoji:"🏞️"}, {word:"Peaches", emoji:"🍑"}, {word:"Soccer", emoji:"⚽"}, {word:"Picture", emoji:"🖼️"}, {word:"Taco", emoji:"🌮"}, {word:"Statue", emoji:"🗿"}, {word:"Future", emoji:"🔮"}],
+                final: [{word:"Watch", emoji:"⌚"}, {word:"Beach", emoji:"🏖️"}, {word:"Lunch", emoji:"🥪"}, {word:"Catch", emoji:"⚾"}, {word:"Witch", emoji:"🧙‍♀️"}, {word:"Rich", emoji:"🤑"}, {word:"Match", emoji:"🔥"}, {word:"Peach", emoji:"🍑"}, {word:"Bench", emoji:"🪑"}, {word:"Coach", emoji:"👨‍🏫"}]
+            },
+            th: {
+                initial: [{word:"Thumb", emoji:"👍"}, {word:"Three", emoji:"3️⃣"}, {word:"Thorn", emoji:"🌹"}, {word:"Think", emoji:"🤔"}, {word:"Thirsty", emoji:"🥵"}, {word:"Thief", emoji:"🏃‍♂️"}, {word:"Thunder", emoji:"⚡"}, {word:"Thimble", emoji:"🧵"}, {word:"Throne", emoji:"👑"}, {word:"Thank you", emoji:"🙏"}],
+                medial: [{word:"Feather", emoji:"🪶"}, {word:"Birthday", emoji:"🎂"}, {word:"Weather", emoji:"🌦️"}, {word:"Bathtub", emoji:"🛁"}, {word:"Tooth fairy", emoji:"🧚"}, {word:"Healthy", emoji:"💪"}, {word:"Father", emoji:"👨"}, {word:"Mother", emoji:"👩"}, {word:"Clothing", emoji:"👚"}, {word:"Something", emoji:"❓"}],
+                final: [{word:"Bath", emoji:"🛀"}, {word:"Mouth", emoji:"👄"}, {word:"Earth", emoji:"🌎"}, {word:"Tooth", emoji:"🦷"}, {word:"Math", emoji:"🧮"}, {word:"Path", emoji:"🛤️"}, {word:"Wreath", emoji:"WREATH"}, {word:"North", emoji:"⬆️"}, {word:"South", emoji:"⬇️"}, {word:"Both", emoji:"✌️"}]
+            }
+        };
+        
+        // --- Event Listeners & Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            for (let i = 0; i < 20; i++) {
+                const bubble = document.createElement('div');
+                bubble.classList.add('bubble');
+                const size = Math.random() * 30 + 10;
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.left = `${Math.random() * 100}%`;
+                bubble.style.animationDuration = `${Math.random() * 10 + 5}s`;
+                bubble.style.animationDelay = `${Math.random() * 5}s`;
+                underwaterBg.appendChild(bubble);
+            }
+        });
+        
+        document.querySelectorAll('.player-sound-select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const playerNum = e.target.dataset.player;
+                const show = e.target.value !== 'none';
+                document.getElementById(`p${playerNum}-position-container`).classList.toggle('hidden', !show);
+                document.getElementById(`p${playerNum}-level-container`).classList.toggle('hidden', !show);
+            });
+        });
+
+        startGameBtn.addEventListener('click', async () => {
+            if (Tone.context.state !== 'running') {
+                await Tone.start();
+            }
+            if (!sounds.place) {
+                sounds.place = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.2 } }).toDestination();
+                sounds.win = new Tone.PolySynth(Tone.Synth).toDestination();
+                sounds.pop = new Tone.MembraneSynth({pitchDecay: 0.01, octaves: 10, oscillator: {type: "sine"}, envelope: {attack: 0.001, decay: 0.2, sustain: 0.01, release: 0.2}}).toDestination();
+            }
+            startGame();
+        });
+        restartGameBtn.addEventListener('click', startGame);
+        backToMenuBtn.addEventListener('click', () => {
+            gameScreen.classList.add('hidden');
+            mainMenu.classList.remove('hidden');
+        });
+
+        document.body.addEventListener('mousemove', (e) => {
+            fishCursor.style.left = `${e.clientX}px`;
+            fishCursor.style.top = `${e.clientY}px`;
+        });
+
+        // --- Game Logic ---
+        function startGame() {
+            p1Settings = { sound: p1.sound.value, position: p1.position.value, level: p1.level.value, masterList: buildWordList(p1.sound.value, p1.position.value) };
+            p2Settings = { sound: p2.sound.value, position: p2.position.value, level: p2.level.value, masterList: buildWordList(p2.sound.value, p2.position.value) };
+            p1GameList = [...p1Settings.masterList];
+            p2GameList = [...p2Settings.masterList];
+
+            mainMenu.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            
+            wordDisplayContainer.style.display = (p1Settings.masterList.length > 0 || p2Settings.masterList.length > 0) ? 'block' : 'none';
+            
+            clearWordDisplay();
+            resetGameState();
+            createBoard();
+            updateStatusMessage();
+            displayRandomWord();
+        }
+
+        function buildWordList(sound, position) {
+            if (sound === 'none' || !soundData[sound]) return [];
+            const soundPositions = soundData[sound];
+            if (position === 'mixed') {
+                return [...soundPositions.initial, ...soundPositions.medial, ...soundPositions.final];
+            }
+            return soundPositions[position] || [];
+        }
+
+        function resetGameState() {
+            board = Array(42).fill(0);
+            currentPlayer = 1;
+            gameOver = false;
+        }
+        
+        function createBoard() {
+            gameBoard.innerHTML = '';
+            for (let c = 0; c < 7; c++) {
+                const column = document.createElement('div');
+                column.classList.add('column');
+                column.dataset.col = c;
+                column.addEventListener('click', handleColumnClick);
+                for (let r = 0; r < 6; r++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    column.appendChild(cell);
+                }
+                gameBoard.appendChild(column);
+            }
+        }
+        
+        function handleColumnClick(event) {
+            if (gameOver || !sounds.place) return;
+            const col = parseInt(event.currentTarget.dataset.col);
+            const row = findEmptyRow(col);
+            if (row === -1) return;
+
+            sounds.place.triggerAttackRelease("C4", "8n");
+            dropPiece(row, col);
+            
+            const winningLine = checkForWin(row, col);
+            if (winningLine) {
+                gameOver = true;
+                updateStatusMessage(`Player ${currentPlayer} Wins!`);
+                highlightWinningPieces(winningLine);
+                return;
+            }
+            
+            if (board.every(cell => cell !== 0)) {
+                gameOver = true;
+                updateStatusMessage("It's a Tie!");
+                return;
+            }
+
+            switchPlayer();
+            updateStatusMessage();
+            displayRandomWord();
+        }
+
+        function findEmptyRow(col) {
+            for (let r = 5; r >= 0; r--) {
+                if (board[r * 7 + col] === 0) return r;
+            }
+            return -1;
+        }
+        
+        function dropPiece(row, col) {
+            board[row * 7 + col] = currentPlayer;
+            const piece = document.createElement('div');
+            piece.classList.add('piece', `player${currentPlayer}`);
+            piece.dataset.row = row;
+            piece.dataset.col = col;
+            const columnElement = gameBoard.children[col];
+            columnElement.appendChild(piece);
+            const targetCell = columnElement.querySelector(`.cell[data-row='${row}']`);
+            const finalTop = targetCell.offsetTop;
+            requestAnimationFrame(() => { piece.style.top = `${finalTop}px`; });
+        }
+        
+        function switchPlayer() {
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+        }
+
+        function updateStatusMessage(message) {
+            if (message) {
+                statusMessage.textContent = message;
+            } else {
+                statusMessage.textContent = ''; // Clear the text for normal turns
+            }
+            
+            wordDisplayContainer.classList.remove('player1-active', 'player2-active');
+            if (!gameOver) {
+                wordDisplayContainer.classList.add(`player${currentPlayer}-active`);
+            }
+
+            if (message && message.includes('Wins')) {
+                 statusMessage.style.color = '#6ee7b7';
+            } else if (message && message.includes('Tie')) {
+                statusMessage.style.color = '#f8fafc';
+            }
+        }
+
+        function checkForWin(r, c) {
+            const player = board[r * 7 + c];
+            const directions = [ {dr:0,dc:1}, {dr:1,dc:0}, {dr:1,dc:1}, {dr:1,dc:-1} ];
+            
+            for (const {dr, dc} of directions) {
+                let line = [{r,c}];
+                for (let i=1;i<4;i++) { const newR=r+i*dr, newC=c+i*dc; if(newR>=0&&newR<6&&newC>=0&&newC<7&&board[newR*7+newC]===player) line.push({r:newR,c:newC}); else break; }
+                for (let i=1;i<4;i++) { const newR=r-i*dr, newC=c-i*dc; if(newR>=0&&newR<6&&newC>=0&&newC<7&&board[newR*7+newC]===player) line.push({r:newR,c:newC}); else break; }
+                if (line.length >= 4) {
+                    return line; // Return the first winning line found
+                }
+            }
+            return null;
+        }
+        
+        function highlightWinningPieces(winningLine) {
+            sounds.win.triggerAttackRelease(["C4", "E4", "G4", "C5"], "4n");
+            winningLine.forEach(({r,c}) => {
+                const piece = document.querySelector(`.piece[data-row='${r}'][data-col='${c}']`);
+                if (piece) piece.classList.add('winning-piece');
+            });
+        }
+        
+        function displayRandomWord() {
+            const isP1 = currentPlayer === 1;
+            const settings = isP1 ? p1Settings : p2Settings;
+            let gameList = isP1 ? p1GameList : p2GameList;
+
+            if (settings.masterList.length === 0) {
+                wordDisplayContainer.style.display = 'none';
+                return;
+            }
+            wordDisplayContainer.style.display = 'block';
+            
+            if (gameList.length === 0) {
+                gameList.push(...settings.masterList);
+            }
+
+            const randomIndex = Math.floor(Math.random() * gameList.length);
+            const wordObj = gameList.splice(randomIndex, 1)[0];
+            
+            let displayText = wordObj.word;
+            const sound = settings.sound;
+            if (settings.level === 'phrase' && carrierData[sound]?.phrase) {
+                displayText = carrierData[sound].phrase.replace('___', `<strong>${wordObj.word}</strong>`);
+            } else if (settings.level === 'sentence' && carrierData[sound]?.sentence) {
+                displayText = carrierData[sound].sentence.replace('___', `<strong>${wordObj.word}</strong>`);
+            }
+            
+            wordText.innerHTML = displayText;
+            wordEmoji.textContent = wordObj.emoji;
+        }
+        
+        function clearWordDisplay() {
+            wordText.textContent = 'Word';
+            wordEmoji.textContent = '🎯';
+        }
+
+    </script>
+    <footer class="text-center text-white text-sm mt-8 opacity-75">
+        &copy; Black Hills Speech Solutions
+    </footer>
+</body>
+</html>
