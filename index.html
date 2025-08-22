@@ -138,39 +138,11 @@
             box-shadow: 0 0 20px #fcd34d, 0 0 30px #fcd34d;
             border-color: #fcd34d !important;
         }
-        #rotate-device-message {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #0c0a1a;
-            color: white;
-            z-index: 10000;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-        }
-        @media (max-width: 767px) and (orientation: portrait) {
-            #rotate-device-message {
-                display: flex;
-            }
-            #main-menu, #game-screen {
-                display: none !important;
-            }
-        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen p-4">
     <div id="underwater-bg"></div>
     <div id="fish-cursor">🐠</div>
-
-    <div id="rotate-device-message">
-        <div class="text-5xl mb-4">🔄</div>
-        <h2 class="font-fredoka text-3xl">Please rotate your device to landscape mode to play!</h2>
-    </div>
 
     <!-- Main Menu Screen -->
     <div id="main-menu" class="w-full max-w-2xl text-center bg-white/20 backdrop-blur-sm p-8 rounded-2xl shadow-lg border border-white/30">
@@ -535,9 +507,12 @@
         
         function highlightWinningPieces(winningLine) {
             sounds.win.triggerAttackRelease(["C4", "E4", "G4", "C5"], "4n");
-            winningLine.forEach(({r,c}) => {
-                const piece = document.querySelector(`.piece[data-row='${r}'][data-col='${c}']`);
-                if (piece) piece.classList.add('winning-piece');
+            winningLine.forEach(({r,c}, index) => {
+                setTimeout(() => {
+                    const piece = document.querySelector(`.piece[data-row='${r}'][data-col='${c}']`);
+                    if (piece) piece.classList.add('winning-piece');
+                    sounds.pop.triggerAttackRelease("C5", "8n", Tone.now());
+                }, index * 100);
             });
         }
         
